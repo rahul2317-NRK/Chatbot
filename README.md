@@ -36,12 +36,14 @@ The Blue Pixel AI Chatbot is built using a modern, scalable architecture with th
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.8+ (Python 3.9-3.11 recommended for Windows)
 - AWS Account (for DynamoDB)
 - OpenAI API Key
 - Google Search API Key (optional)
 
 ### Installation
+
+#### Option 1: Windows Installation (Recommended)
 
 1. **Clone the repository**
    ```bash
@@ -49,14 +51,14 @@ The Blue Pixel AI Chatbot is built using a modern, scalable architecture with th
    cd blue-pixel-ai-chatbot
    ```
 
-2. **Install dependencies**
+2. **Run the Windows installer**
    ```bash
-   pip install -r requirements.txt
+   install-windows.bat
    ```
 
 3. **Set up environment variables**
    ```bash
-   cp .env.example .env
+   copy .env.example .env
    ```
    
    Edit `.env` with your configuration:
@@ -71,13 +73,70 @@ The Blue Pixel AI Chatbot is built using a modern, scalable architecture with th
 
 4. **Run the application**
    ```bash
-   python -m uvicorn app.main:app --reload
+   python run.py
    ```
 
-5. **Access the application**
+#### Option 2: Manual Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd blue-pixel-ai-chatbot
+   ```
+
+2. **Upgrade pip and install build tools**
+   ```bash
+   python -m pip install --upgrade pip setuptools wheel
+   ```
+
+3. **Install dependencies**
+   ```bash
+   # For Windows users
+   pip install -r requirements-windows.txt
+   
+   # For Linux/Mac users
+   pip install -r requirements.txt
+   ```
+
+4. **Set up environment variables**
+   ```bash
+   cp .env.example .env  # Linux/Mac
+   copy .env.example .env  # Windows
+   ```
+   
+   Edit `.env` with your configuration.
+
+5. **Run the application**
+   ```bash
+   python run.py
+   ```
+
+6. **Access the application**
    - Web Interface: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
    - MCP Tools: http://localhost:8000/mcp/tools
+
+### Troubleshooting Windows Installation
+
+If you encounter build errors (especially with NumPy/Pandas), try these solutions:
+
+1. **Use pre-compiled packages**
+   ```bash
+   pip install --only-binary=all numpy pandas
+   ```
+
+2. **Install Microsoft Visual C++ Build Tools**
+   - Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+   - Install "C++ build tools" workload
+
+3. **Use conda instead of pip**
+   ```bash
+   conda install numpy pandas
+   pip install -r requirements-windows.txt
+   ```
+
+4. **Skip optional packages**
+   The application works without NumPy/Pandas. They're only used for enhanced data processing.
 
 ## 📡 API Endpoints
 
