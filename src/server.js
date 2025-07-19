@@ -18,9 +18,37 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Import services
-import { AIService } from './services/aiService.js';
-import logger from './utils/logger.js';
+// Import services (only if they exist)
+let AIService, logger;
+try {
+  const aiModule = await import('./services/aiService.js');
+  AIService = aiModule.AIService;
+  const loggerModule = await import('./utils/logger.js');
+  logger = loggerModule.default;
+} catch (error) {
+  console.log('Using fallback logger and AI service');
+  // Fallback logger
+  logger = {
+    info: console.log,
+    error: console.error,
+    warn: console.warn,
+    debug: console.log
+  };
+  
+  // Fallback AI service
+  AIService = class {
+    async processMessage({ message, sessionId, userId }) {
+      return {
+        response: `I received your message: "${message}". This is a fallback response since the full AI service isn't loaded yet.`,
+        sessionId,
+        timestamp: new Date().toISOString(),
+        toolsUsed: [],
+        propertyData: null,
+        executionTime: 100
+      };
+    }
+  };
+}
 
 const app = express();
 const server = createServer(app);
