@@ -289,16 +289,29 @@
                 },
 
                 initializeSocket() {
+                    console.log('🔌 Initializing WebSocket connection...');
                     this.socket = io();
                     
                     this.socket.on('connect', () => {
                         this.socketConnected = true;
-                        console.log('Connected to server');
+                        console.log('✅ Connected to server successfully!');
+                        console.log('Socket ID:', this.socket.id);
+                        
+                        // Join session if we have one
+                        if (this.sessionId) {
+                            console.log('Joining session:', this.sessionId);
+                            this.socket.emit('join_session', this.sessionId);
+                        }
                     });
 
                     this.socket.on('disconnect', () => {
                         this.socketConnected = false;
-                        console.log('Disconnected from server');
+                        console.log('❌ Disconnected from server');
+                    });
+                    
+                    this.socket.on('connect_error', (error) => {
+                        console.error('❌ WebSocket connection error:', error);
+                        this.socketConnected = false;
                     });
 
                     this.socket.on('ai_response', (data) => {
@@ -349,10 +362,24 @@
                 },
 
                 sendMessage() {
-                    if (!this.currentMessage.trim() || !this.socketConnected) return;
+                    console.log('📤 Attempting to send message...');
+                    console.log('Socket connected:', this.socketConnected);
+                    console.log('Current message:', this.currentMessage.trim());
+                    
+                    if (!this.currentMessage.trim()) {
+                        console.log('❌ Message is empty');
+                        return;
+                    }
+                    
+                    if (!this.socketConnected) {
+                        console.log('❌ Socket not connected');
+                        return;
+                    }
                     
                     const messageText = this.currentMessage.trim();
                     this.currentMessage = '';
+                    
+                    console.log('✅ Sending message:', messageText);
                     
                     // Add user message
                     this.addMessage('user', messageText);
@@ -364,6 +391,8 @@
                         sessionId: this.sessionId,
                         userId: this.userId
                     });
+                    
+                    console.log('📤 Message sent to server');
                 },
 
                 addMessage(type, content, propertyData = null, toolsUsed = [], executionTime = null) {
@@ -383,6 +412,7 @@
                 },
 
                 quickAction(action) {
+                    console.log('🎯 Quick action clicked:', action);
                     this.currentMessage = action;
                     this.sendMessage();
                 },
