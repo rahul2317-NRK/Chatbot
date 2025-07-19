@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue Pixel AI - Simple Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div x-data="simpleChatApp()" x-init="init()" class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 py-4">
+                <h1 class="text-2xl font-bold text-blue-600">Blue Pixel AI - Simple Chat</h1>
+                <p class="text-gray-600">Status: <span x-text="socketConnected ? 'Connected' : 'Connecting...'" :class="socketConnected ? 'text-green-600' : 'text-yellow-600'"></span></p>
+            </div>
+        </header>
+
+        <div class="max-w-4xl mx-auto p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Chat Area -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow-lg">
+                        <!-- Messages -->
+                        <div class="h-96 overflow-y-auto p-4 space-y-4" id="chatContainer">
+                            <!-- Welcome Message -->
+                            <div class="flex items-start space-x-3">
+                                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">AI</div>
+                                <div class="bg-gray-100 rounded-lg p-3 max-w-xs">
+                                    <p>Welcome to Blue Pixel AI! I'm your real estate assistant. How can I help you today?</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Dynamic Messages -->
+                            <template x-for="message in messages" :key="message.id">
+                                <div class="flex items-start space-x-3" :class="message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm" :class="message.type === 'user' ? 'bg-green-500' : 'bg-blue-500'">
+                                        <span x-text="message.type === 'user' ? 'You' : 'AI'"></span>
+                                    </div>
+                                    <div class="rounded-lg p-3 max-w-xs" :class="message.type === 'user' ? 'bg-green-100' : 'bg-gray-100'">
+                                        <p x-text="message.content"></p>
+                                        <p class="text-xs text-gray-500 mt-1" x-text="new Date(message.timestamp).toLocaleTimeString()"></p>
+                                    </div>
+                                </div>
+                            </template>
+                            
+                            <!-- Typing Indicator -->
+                            <div x-show="isTyping" class="flex items-start space-x-3">
+                                <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">AI</div>
+                                <div class="bg-gray-100 rounded-lg p-3">
+                                    <p class="text-gray-600">Typing...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Input Area -->
+                        <div class="border-t p-4">
+                            <form @submit.prevent="sendMessage()" class="flex space-x-4">
+                                <input 
+                                    x-model="currentMessage"
+                                    type="text" 
+                                    placeholder="Type your message..."
+                                    class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                <button 
+                                    type="submit"
+                                    :disabled="!currentMessage.trim() || !socketConnected"
+                                    class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                    Send
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="space-y-6">
+                    <!-- Quick Actions -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">Quick Actions</h3>
+                        <div class="space-y-3">
+                            <button @click="quickAction('Find properties under $500,000')" class="w-full bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600">
+                                Property Search
+                            </button>
+                            <button @click="quickAction('Calculate mortgage for $450,000')" class="w-full bg-green-500 text-white p-3 rounded-lg hover:bg-green-600">
+                                Mortgage Calculator
+                            </button>
+                            <button @click="quickAction('What are current interest rates?')" class="w-full bg-purple-500 text-white p-3 rounded-lg hover:bg-purple-600">
+                                Interest Rates
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">Session Info</h3>
+                        <div class="space-y-2">
+                            <p class="text-sm">Messages: <span x-text="messages.length" class="font-bold"></span></p>
+                            <p class="text-sm">Session: <span x-text="sessionId ? sessionId.substring(0, 8) + '...' : 'None'" class="font-bold"></span></p>
+                            <p class="text-sm">Socket: <span x-text="socketConnected ? 'Connected' : 'Disconnected'" :class="socketConnected ? 'text-green-600' : 'text-red-600'" class="font-bold"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🚀 Starting Simple Chat App...');
+        
+        function simpleChatApp() {
+            console.log('📦 simpleChatApp function called');
+            
+            return {
+                messages: [],
+                currentMessage: '',
+                isTyping: false,
+                sessionId: null,
+                userId: null,
+                socket: null,
+                socketConnected: false,
+                
+                async init() {
+                    console.log('🚀 Init function called');
+                    try {
+                        await this.initializeSocket();
+                        await this.createNewSession();
+                        console.log('✅ Initialization complete');
+                    } catch (error) {
+                        console.error('❌ Initialization error:', error);
+                    }
+                },
+                
+                initializeSocket() {
+                    return new Promise((resolve) => {
+                        console.log('🔌 Initializing WebSocket...');
+                        
+                        if (typeof io === 'undefined') {
+                            console.error('❌ Socket.io not loaded');
+                            resolve();
+                            return;
+                        }
+                        
+                        this.socket = io();
+                        
+                        this.socket.on('connect', () => {
+                            console.log('✅ Socket connected');
+                            this.socketConnected = true;
+                            if (this.sessionId) {
+                                this.socket.emit('join_session', this.sessionId);
+                            }
+                            resolve();
+                        });
+                        
+                        this.socket.on('disconnect', () => {
+                            console.log('❌ Socket disconnected');
+                            this.socketConnected = false;
+                        });
+                        
+                        this.socket.on('connect_error', (error) => {
+                            console.error('❌ Socket connection error:', error);
+                            this.socketConnected = false;
+                            resolve();
+                        });
+                        
+                        this.socket.on('ai_response', (data) => {
+                            console.log('📨 Received AI response:', data);
+                            this.isTyping = false;
+                            this.addMessage('assistant', data.response || 'I received your message!');
+                        });
+                        
+                        this.socket.on('error', (data) => {
+                            console.error('❌ Socket error:', data);
+                            this.isTyping = false;
+                            this.addMessage('assistant', `Error: ${data.message}`);
+                        });
+                        
+                        // Fallback timeout
+                        setTimeout(() => {
+                            if (!this.socketConnected) {
+                                console.log('⏰ Socket connection timeout, continuing anyway');
+                                resolve();
+                            }
+                        }, 3000);
+                    });
+                },
+                
+                async createNewSession() {
+                    try {
+                        console.log('📝 Creating new session...');
+                        const response = await fetch('/api/chat/sessions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.sessionId = data.sessionId;
+                            this.userId = data.userId;
+                            console.log('✅ Session created:', this.sessionId);
+                            
+                            if (this.socket && this.socketConnected) {
+                                this.socket.emit('join_session', this.sessionId);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('❌ Session creation error:', error);
+                    }
+                },
+                
+                sendMessage() {
+                    console.log('📤 Sending message:', this.currentMessage);
+                    
+                    if (!this.currentMessage.trim()) {
+                        console.log('❌ Message is empty');
+                        return;
+                    }
+                    
+                    const messageText = this.currentMessage.trim();
+                    this.currentMessage = '';
+                    
+                    // Add user message
+                    this.addMessage('user', messageText);
+                    this.isTyping = true;
+                    
+                    // Send via WebSocket if connected
+                    if (this.socket && this.socketConnected) {
+                        console.log('📡 Sending via WebSocket');
+                        this.socket.emit('chat_message', {
+                            message: messageText,
+                            sessionId: this.sessionId,
+                            userId: this.userId
+                        });
+                    } else {
+                        // Fallback response if no socket connection
+                        console.log('📴 No socket connection, using fallback');
+                        setTimeout(() => {
+                            this.isTyping = false;
+                            this.addMessage('assistant', `I received your message: "${messageText}". (This is a fallback response - socket not connected)`);
+                        }, 1000);
+                    }
+                },
+                
+                quickAction(action) {
+                    console.log('🎯 Quick action:', action);
+                    this.currentMessage = action;
+                    this.sendMessage();
+                },
+                
+                addMessage(type, content) {
+                    console.log('💬 Adding message:', type, content);
+                    this.messages.push({
+                        id: Date.now(),
+                        type: type,
+                        content: content,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Scroll to bottom
+                    this.$nextTick(() => {
+                        const container = document.getElementById('chatContainer');
+                        if (container) {
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            console.error('🚨 Global JavaScript error:', event.error);
+        });
+        
+        console.log('📝 Simple chat script loaded');
+    </script>
+</body>
+</html>
